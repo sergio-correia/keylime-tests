@@ -88,7 +88,7 @@ Verifier() {
         rlRun "limeUpdateConf cloud_verifier registrar_ip ${REGISTRAR_IP}"
         # configure certificates
         CERTDIR=/var/lib/keylime/certs
-        rlRun "mkdir $CERTDIR && cp certs/cacert.pem certs/verifier*.pem $CERTDIR"
+        rlRun "mkdir -p $CERTDIR && cp certs/cacert.pem certs/verifier*.pem $CERTDIR"
         rlRun "limeUpdateConf cloud_verifier tls_dir $CERTDIR"
         rlRun "limeUpdateConf cloud_verifier ca_cert cacert.pem"
         rlRun "limeUpdateConf cloud_verifier my_cert verifier-cert.pem"
@@ -123,7 +123,7 @@ Registrar() {
 
         # download certificates from the verifier
         CERTDIR=/var/lib/keylime/certs
-        rlRun "mkdir $CERTDIR"
+        rlRun "mkdir -p $CERTDIR"
         for F in cacert.pem registrar-cert.pem registrar-key.pem; do
             rlRun "wget -O $CERTDIR/$F 'http://$VERIFIER:8000/$F'"
         done
@@ -162,7 +162,7 @@ Agent() {
         # tenant setup
         # download certificates from the verifier
         CERTDIR=/var/lib/keylime/certs
-        rlRun "mkdir $CERTDIR"
+        rlRun "mkdir -p $CERTDIR"
         for F in cacert.pem tenant-cert.pem tenant-key.pem; do
             rlRun "wget -O $CERTDIR/$F 'http://$VERIFIER:8000/$F'"
         done

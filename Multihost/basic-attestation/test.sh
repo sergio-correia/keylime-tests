@@ -36,6 +36,14 @@
 # assigned hostnames should be available in environment variables
 # of the respective name
 
+
+# updates /etc/keylime.conf
+# params: SECTION_NAME KEY NEW_VALUE SED_FLAGS
+function update_conf() {
+  sed -i "/^\[$1\]/,/^\[/ s/^$2.*/$2=$3/$4" /etc/keylime.conf
+}
+
+
 function get_IP() {
     if echo $1 | egrep -q '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'; then
         echo $1
@@ -46,27 +54,61 @@ function get_IP() {
 
 
 Verifier() {
-    rlPhaseStartSetup Verifier
+    rlPhaseStartSetup "Verifier setup"
+        # generate TLS certificates for all
+        rlRun "x509KeyGen ca" 0 "Preparing RSA CA certificate"
+        rlRun "x509KeyGen verifier" 0 "Preparing RSA verifier certificate"
+        rlRun "x509KeyGen registrar" 0 "Preparing RSA registrar certificate"
+        rlRun "x509KeyGen agent" 0 "Preparing RSA agent certificate"
+        rlRun "x509KeyGen tenant" 0 "Preparing RSA agent certificate"
+        rlRun "x509SelfSign ca" 0 "Selfsigning CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' verifier" 0 "Signing verifier certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $REGISTRAR' registrar" 0 "Signing registrar certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' agent" 0 "Signing agent certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' tenant" 0 "Signing tenant certificate with our CA certificate"
+        # expose certificates for clients
+        rlRun "mkdir certs"
+        rlRun "cp $(x509Cert ca) certs/cacert.pem"
+        rlRun "cp $(x509Cert verifier) certs/verifier-cert.pem"
+        rlRun "cp $(x509Key verifier) certs/verifier-key.pem"
+        rlRun "cp $(x509Cert registrar) certs/registrar-cert.pem"
+        rlRun "cp $(x509Key registrar) certs/registrar-key.pem"
+        rlRun "cp $(x509Cert agent) certs/agent-cert.pem"
+        rlRun "cp $(x509Key agent) certs/agent-key.pem"
+        rlRun "cp $(x509Cert agent) certs/tenant-cert.pem"
+        rlRun "cp $(x509Key agent) certs/tenant-key.pem"
+        rlRun "python3 -m http.server 8000 &"
+        HTTP_PID=$!
+
         # Verifier and Tenant setup goes here
         rlRun "sed -i 's/^require_ek_cert.*/require_ek_cert = False/' /etc/keylime.conf"
         rlRun "sed -i 's/^cloudverifier_ip.*/cloudverifier_ip = ${VERIFIER_IP}/g' /etc/keylime.conf"
         rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
+        # configure certificates
+        CERTDIR=/var/lib/keylime/certs
+        rlRun "mkdir $CERTDIR && cp certs/cacert.pem certs/verifier*.pem certs/tenant*.pem $CERTDIR"
+        rlRun "update_conf cloud_verifier tls_dir $CERTDIR"
+        rlRun "update_conf cloud_verifier ca_cert cacert.pem"
+        rlRun "update_conf cloud_verifier my_cert verifier-cert.pem"
+        rlRun "update_conf cloud_verifier private_key verifier-key.pem"
+        rlRun "update_conf cloud_verifier private_key_pw ''"
 
+exit 0
         # start keylime_verifier
         limeStartVerifier
         rlRun "limeWaitForVerifier"
-
         rlRun "rhts-sync-set -s VERIFIER_SETUP_DONE"
         rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE $AGENT" 0 "Waiting for the Agent to finish the test"
     rlPhaseEnd
 
-    rlPhaseStartTest Verifier
+    rlPhaseStartTest "Verifier test"
         rlAssertGrep "WARNING - File not found in allowlist: .*/keylime-bad-script.sh" $(limeVerifierLogfile) -E
         AGENT_ID="d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
         rlAssertGrep "WARNING - Agent $AGENT_ID failed, stopping polling" $(limeVerifierLogfile)
     rlPhaseEnd
 
-    rlPhaseStartCleanup Verifier
+    rlPhaseStartCleanup "Verifier cleanup"
+        rlRun "kill $HTTP_PID"
         limeStopVerifier
         rlFileSubmit $(limeVerifierLogfile)
     rlPhaseEnd
@@ -74,10 +116,10 @@ Verifier() {
 
 
 Registrar() {
-    rlPhaseStartSetup Registrar
+    rlPhaseStartSetup "Registrar setup"
         # Registrar setup goes here
         rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
-
+exit 0
         rlRun "rhts-sync-block -s VERIFIER_SETUP_DONE $VERIFIER" 0 "Waiting for the Verifier to start"
 
         limeStartRegistrar
@@ -87,7 +129,7 @@ Registrar() {
         rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE $AGENT" 0 "Waiting for the Agent to finish the test"
     rlPhaseEnd
 
-    rlPhaseStartCleanup Registrar
+    rlPhaseStartCleanup "Registrar cleanup"
         limeStopRegistrar
         rlFileSubmit $(limeRegistrarLogfile)
     rlPhaseEnd
@@ -95,11 +137,11 @@ Registrar() {
 
 
 Agent() {
-    rlPhaseStartSetup Agent
+    rlPhaseStartSetup "Agent setup"
         # Agent setup goes here
         rlRun "sed -i 's/^cloudverifier_ip.*/cloudverifier_ip = ${VERIFIER_IP}/g' /etc/keylime.conf"
         rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
-
+exit 0
         rlRun "rhts-sync-block -s REGISTRAR_SETUP_DONE $REGISTRAR" 0 "Waiting for the Registrar finish to start"
 
         # if IBM TPM emulator is present
@@ -126,7 +168,7 @@ Agent() {
 
     rlPhaseEnd
 
-    rlPhaseStartTest "Add keylime tenant"
+    rlPhaseStartTest "Agent test: Add keylime tenant"
         AGENT_ID="d432fbb3-d2f1-4a97-9ef7-75bd81c00000"
         rlRun "keylime_tenant -v ${VERIFIER_IP} -t ${AGENT_IP} -u ${AGENT_ID} -f excludelist.txt --allowlist allowlist.txt --exclude excludelist.txt -c add"
         sleep 5
@@ -136,7 +178,7 @@ Agent() {
         rlAssertGrep '"operational_state": "Get Quote"' $rlRun_LOG
     rlPhaseEnd
 
-    rlPhaseStartTest "Fail keylime tenant"
+    rlPhaseStartTest "Agent test: Fail keylime tenant"
         TESTDIR=`limeCreateTestDir`
         limeExtendNextExcludelist $TESTDIR
         rlRun "echo -e '#!/bin/bash\necho boom' > $TESTDIR/keylime-bad-script.sh && chmod a+x $TESTDIR/keylime-bad-script.sh"
@@ -146,7 +188,7 @@ Agent() {
         rlAssertGrep '"operational_state": "(Failed|Invalid Quote)"' $rlRun_LOG -E
     rlPhaseEnd
 
-    rlPhaseStartCleanup Agent
+    rlPhaseStartCleanup "Agent cleanup"
         rlRun "rhts-sync-set -s AGENT_ALL_TESTS_DONE"
         limeStopAgent
         rlFileSubmit $(limeAgentLogfile)
@@ -181,11 +223,11 @@ rlJournalStart
 
         # import keylime library
         rlRun 'rlImport "./test-helpers"' || rlDie "cannot import keylime-tests/test-helpers library"
+        rlRun 'rlImport "openssl/certgen"' || rlDie "cannot import openssl/certgen library"
         # backup files
         limeBackupConfig
         # update /etc/keylime.conf
-        rlRun "sed -i 's/^ca_implementation.*/ca_implementation = openssl/' /etc/keylime.conf"
-        rlRun "sed -i 's/^enable_tls.*/enable_tls = False/' /etc/keylime.conf"
+        #rlRun "sed -i 's/^ca_implementation.*/ca_implementation = openssl/' /etc/keylime.conf"
     rlPhaseEnd
 
     if echo $VERIFIER | grep -q $HOSTNAME ; then

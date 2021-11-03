@@ -26,7 +26,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Include Beaker environment
-. /usr/bin/rhts-environment.sh || exit 1
+#. /usr/bin/rhts-environment.sh || exit 1
 . /usr/share/beakerlib/beakerlib.sh || exit 1
 
 # The following roles are expected to be assigned during test scheduling
@@ -39,8 +39,8 @@
 
 # updates /etc/keylime.conf
 # params: SECTION_NAME KEY NEW_VALUE SED_FLAGS
-function update_conf() {
-  sed -i "/^\[$1\]/,/^\[/ s/^$2.*/$2=$3/$4" /etc/keylime.conf
+function limeUpdateConf() {
+  sed -i "/^\[$1\]/,/^\[/ s@^$2 *=.*@$2 = $3@$4" /etc/keylime.conf
 }
 
 
@@ -65,7 +65,7 @@ Verifier() {
         rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' verifier" 0 "Signing verifier certificate with our CA certificate"
         rlRun "x509CertSign --CA ca --DN 'CN = $REGISTRAR' registrar" 0 "Signing registrar certificate with our CA certificate"
         rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' agent" 0 "Signing agent certificate with our CA certificate"
-        rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' tenant" 0 "Signing tenant certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $TENANT' tenant" 0 "Signing tenant certificate with our CA certificate"
         # expose certificates for clients
         rlRun "mkdir certs"
         rlRun "cp $(x509Cert ca) certs/cacert.pem"
@@ -77,23 +77,23 @@ Verifier() {
         rlRun "cp $(x509Key agent) certs/agent-key.pem"
         rlRun "cp $(x509Cert agent) certs/tenant-cert.pem"
         rlRun "cp $(x509Key agent) certs/tenant-key.pem"
+        rlRun "pushd certs"
         rlRun "python3 -m http.server 8000 &"
         HTTP_PID=$!
+        rlRun "popd"
 
-        # Verifier and Tenant setup goes here
-        rlRun "sed -i 's/^require_ek_cert.*/require_ek_cert = False/' /etc/keylime.conf"
-        rlRun "sed -i 's/^cloudverifier_ip.*/cloudverifier_ip = ${VERIFIER_IP}/g' /etc/keylime.conf"
-        rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
+        # Verifier setup goes here
+        rlRun "limeUpdateConf cloud_verifier cloudverifier_ip ${VERIFIER_IP}"
+        rlRun "limeUpdateConf cloud_verifier registrar_ip = ${REGISTRAR_IP}"
         # configure certificates
         CERTDIR=/var/lib/keylime/certs
-        rlRun "mkdir $CERTDIR && cp certs/cacert.pem certs/verifier*.pem certs/tenant*.pem $CERTDIR"
-        rlRun "update_conf cloud_verifier tls_dir $CERTDIR"
-        rlRun "update_conf cloud_verifier ca_cert cacert.pem"
-        rlRun "update_conf cloud_verifier my_cert verifier-cert.pem"
-        rlRun "update_conf cloud_verifier private_key verifier-key.pem"
-        rlRun "update_conf cloud_verifier private_key_pw ''"
+        rlRun "mkdir $CERTDIR && cp certs/cacert.pem certs/verifier*.pem $CERTDIR"
+        rlRun "limeUpdateConf cloud_verifier tls_dir $CERTDIR"
+        rlRun "limeUpdateConf cloud_verifier ca_cert cacert.pem"
+        rlRun "limeUpdateConf cloud_verifier my_cert verifier-cert.pem"
+        rlRun "limeUpdateConf cloud_verifier private_key verifier-key.pem"
+        rlRun "limeUpdateConf cloud_verifier private_key_pw ''"
 
-exit 0
         # start keylime_verifier
         limeStartVerifier
         rlRun "limeWaitForVerifier"
@@ -118,9 +118,22 @@ exit 0
 Registrar() {
     rlPhaseStartSetup "Registrar setup"
         # Registrar setup goes here
-        rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
-exit 0
         rlRun "rhts-sync-block -s VERIFIER_SETUP_DONE $VERIFIER" 0 "Waiting for the Verifier to start"
+
+        # download certificates from the verifier
+        CERTDIR=/var/lib/keylime/certs
+        rlRun "mkdir $CERTDIR"
+        for F in cacert.pem registrar-cert.pem registrar-key.pem; do
+            rlRun "wget -O $CERTDIR/$F 'http://$VERIFIER:8000/$F'"
+        done
+        # configure certificates
+        rlRun "limeUpdateConf registrar tls_dir $CERTDIR"
+        rlRun "limeUpdateConf registrar ca_cert cacert.pem"
+        rlRun "limeUpdateConf registrar my_cert registrar-cert.pem"
+        rlRun "limeUpdateConf registrar private_key registrar-key.pem"
+        rlRun "limeUpdateConf registrar private_key_pw ''"
+        # configure registrar
+        rlRun "limeUpdateConf registrar registrar_ip = ${REGISTRAR_IP}"
 
         limeStartRegistrar
         rlRun "limeWaitForRegistrar"
@@ -137,12 +150,31 @@ exit 0
 
 
 Agent() {
-    rlPhaseStartSetup "Agent setup"
-        # Agent setup goes here
-        rlRun "sed -i 's/^cloudverifier_ip.*/cloudverifier_ip = ${VERIFIER_IP}/g' /etc/keylime.conf"
-        rlRun "sed -i 's/^registrar_ip.*/registrar_ip = ${REGISTRAR_IP}/g' /etc/keylime.conf"
-exit 0
+    rlPhaseStartSetup "Agent and tenant setup"
+        # Agent and tenant setup goes here
         rlRun "rhts-sync-block -s REGISTRAR_SETUP_DONE $REGISTRAR" 0 "Waiting for the Registrar finish to start"
+
+        # agent setup
+        #rlRun "limeUpdateConf cloud_agent cloudverifier_ip ${VERIFIER_IP}"
+        rlRun "limeUpdateConf cloud_agent registrar_ip = ${REGISTRAR_IP}"
+
+        # tenant setup
+        # download certificates from the verifier
+        CERTDIR=/var/lib/keylime/certs
+        rlRun "mkdir $CERTDIR"
+        for F in cacert.pem tenant-cert.pem tenant-key.pem; do
+            rlRun "wget -O $CERTDIR/$F 'http://$VERIFIER:8000/$F'"
+        done
+        # configure tenant certificates
+        rlRun "limeUpdateConf tenant tls_dir $CERTDIR"
+        rlRun "limeUpdateConf tenant ca_cert cacert.pem"
+        rlRun "limeUpdateConf tenant my_cert tenant-cert.pem"
+        rlRun "limeUpdateConf tenant private_key tenant-key.pem"
+        rlRun "limeUpdateConf tenant private_key_pw ''"
+        # configure tenant
+        rlRun "limeUpdateConf tenant cloudverifier_ip ${VERIFIER_IP}"
+        rlRun "limeUpdateConf tenant registrar_ip = ${REGISTRAR_IP}"
+        rlRun "limeUpdateConf tenant require_ek_cert False"
 
         # if IBM TPM emulator is present
         if limeTPMEmulated; then
@@ -165,7 +197,6 @@ exit 0
         sleep 5
         # create allowlist and excludelist
         limeCreateTestLists
-
     rlPhaseEnd
 
     rlPhaseStartTest "Agent test: Add keylime tenant"
@@ -201,6 +232,11 @@ exit 0
     rlPhaseEnd
 }
 
+
+####################
+# Common script part
+####################
+
 # assigne custom roles using SERVERS and CLIENTS variables
 export VERIFIER=$( echo "$SERVERS $CLIENTS" | cut -d ' ' -f 1)
 export REGISTRAR=$( echo "$SERVERS $CLIENTS" | cut -d ' ' -f 2)
@@ -226,8 +262,6 @@ rlJournalStart
         rlRun 'rlImport "openssl/certgen"' || rlDie "cannot import openssl/certgen library"
         # backup files
         limeBackupConfig
-        # update /etc/keylime.conf
-        #rlRun "sed -i 's/^ca_implementation.*/ca_implementation = openssl/' /etc/keylime.conf"
     rlPhaseEnd
 
     if echo $VERIFIER | grep -q $HOSTNAME ; then

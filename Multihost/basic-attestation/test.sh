@@ -65,7 +65,8 @@ Verifier() {
         rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' verifier" 0 "Signing verifier certificate with our CA certificate"
         rlRun "x509CertSign --CA ca --DN 'CN = $REGISTRAR' registrar" 0 "Signing registrar certificate with our CA certificate"
         rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' agent" 0 "Signing agent certificate with our CA certificate"
-        rlRun "x509CertSign --CA ca --DN 'CN = $TENANT' tenant" 0 "Signing tenant certificate with our CA certificate"
+        # we are running tenant on agent server
+        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' tenant" 0 "Signing tenant certificate with our CA certificate"
         # expose certificates for clients
         rlRun "mkdir certs"
         rlRun "cp $(x509Cert ca) certs/cacert.pem"
@@ -84,7 +85,7 @@ Verifier() {
 
         # Verifier setup goes here
         rlRun "limeUpdateConf cloud_verifier cloudverifier_ip ${VERIFIER_IP}"
-        rlRun "limeUpdateConf cloud_verifier registrar_ip = ${REGISTRAR_IP}"
+        rlRun "limeUpdateConf cloud_verifier registrar_ip ${REGISTRAR_IP}"
         # configure certificates
         CERTDIR=/var/lib/keylime/certs
         rlRun "mkdir $CERTDIR && cp certs/cacert.pem certs/verifier*.pem $CERTDIR"
@@ -133,7 +134,7 @@ Registrar() {
         rlRun "limeUpdateConf registrar private_key registrar-key.pem"
         rlRun "limeUpdateConf registrar private_key_pw ''"
         # configure registrar
-        rlRun "limeUpdateConf registrar registrar_ip = ${REGISTRAR_IP}"
+        rlRun "limeUpdateConf registrar registrar_ip ${REGISTRAR_IP}"
 
         limeStartRegistrar
         rlRun "limeWaitForRegistrar"
@@ -156,7 +157,7 @@ Agent() {
 
         # agent setup
         #rlRun "limeUpdateConf cloud_agent cloudverifier_ip ${VERIFIER_IP}"
-        rlRun "limeUpdateConf cloud_agent registrar_ip = ${REGISTRAR_IP}"
+        rlRun "limeUpdateConf cloud_agent registrar_ip ${REGISTRAR_IP}"
 
         # tenant setup
         # download certificates from the verifier
@@ -173,7 +174,7 @@ Agent() {
         rlRun "limeUpdateConf tenant private_key_pw ''"
         # configure tenant
         rlRun "limeUpdateConf tenant cloudverifier_ip ${VERIFIER_IP}"
-        rlRun "limeUpdateConf tenant registrar_ip = ${REGISTRAR_IP}"
+        rlRun "limeUpdateConf tenant registrar_ip ${REGISTRAR_IP}"
         rlRun "limeUpdateConf tenant require_ek_cert False"
 
         # if IBM TPM emulator is present

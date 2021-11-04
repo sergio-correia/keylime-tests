@@ -36,6 +36,11 @@
 # assigned hostnames should be available in environment variables
 # of the respective name
 
+# when manually troubleshooting multihost test in Restraint environment
+# you may want to export DEBUG_RUN_COUNTER to a unique number each team
+# to make user that sync events have unique names and there are not
+# collisions with former test runs
+
 
 # updates /etc/keylime.conf
 # params: SECTION_NAME KEY NEW_VALUE SED_FLAGS
@@ -62,11 +67,11 @@ Verifier() {
         rlRun "x509KeyGen agent" 0 "Preparing RSA agent certificate"
         rlRun "x509KeyGen tenant" 0 "Preparing RSA agent certificate"
         rlRun "x509SelfSign ca" 0 "Selfsigning CA certificate"
-        rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER' verifier" 0 "Signing verifier certificate with our CA certificate"
-        rlRun "x509CertSign --CA ca --DN 'CN = $REGISTRAR' registrar" 0 "Signing registrar certificate with our CA certificate"
-        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' agent" 0 "Signing agent certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $VERIFIER_IP' -t webserver --subjectAltName 'IP = ${VERIFIER_IP}' verifier" 0 "Signing verifier certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $REGISTRAR' -t webserver --subjectAltName 'IP = ${REGISTRAR_IP}' registrar" 0 "Signing registrar certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' -t webclient --subjectAltName 'IP = ${AGENT_IP}' agent" 0 "Signing agent certificate with our CA certificate"
         # we are running tenant on agent server
-        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' tenant" 0 "Signing tenant certificate with our CA certificate"
+        rlRun "x509CertSign --CA ca --DN 'CN = $AGENT' -t webclient --subjectAltName 'IP = ${AGENT_IP}' tenant" 0 "Signing tenant certificate with our CA certificate"
         # expose certificates for clients
         rlRun "mkdir certs"
         rlRun "cp $(x509Cert ca) certs/cacert.pem"
@@ -94,12 +99,17 @@ Verifier() {
         rlRun "limeUpdateConf cloud_verifier my_cert verifier-cert.pem"
         rlRun "limeUpdateConf cloud_verifier private_key verifier-key.pem"
         rlRun "limeUpdateConf cloud_verifier private_key_pw ''"
+#        rlRun "limeUpdateConf cloud_verifier registrar_tls_dir $CERTDIR"
+#        rlRun "limeUpdateConf cloud_verifier registrar_ca_cert cacert.pem"
+#        rlRun "limeUpdateConf cloud_verifier registrar_my_cert verifier-cert.pem"
+#        rlRun "limeUpdateConf cloud_verifier registrar_private_key verifier-key.pem"
+#        rlRun "limeUpdateConf cloud_verifier registrar_private_key_pw ''"
 
         # start keylime_verifier
         limeStartVerifier
         rlRun "limeWaitForVerifier"
-        rlRun "rhts-sync-set -s VERIFIER_SETUP_DONE"
-        rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE $AGENT" 0 "Waiting for the Agent to finish the test"
+        rlRun "rhts-sync-set -s VERIFIER_SETUP_DONE_${DEBUG_RUN_COUNTER}"
+        rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE_${DEBUG_RUN_COUNTER} $AGENT" 0 "Waiting for the Agent to finish the test"
     rlPhaseEnd
 
     rlPhaseStartTest "Verifier test"
@@ -119,7 +129,7 @@ Verifier() {
 Registrar() {
     rlPhaseStartSetup "Registrar setup"
         # Registrar setup goes here
-        rlRun "rhts-sync-block -s VERIFIER_SETUP_DONE $VERIFIER" 0 "Waiting for the Verifier to start"
+        rlRun "rhts-sync-block -s VERIFIER_SETUP_DONE_${DEBUG_RUN_COUNTER} $VERIFIER" 0 "Waiting for the Verifier to start"
 
         # download certificates from the verifier
         CERTDIR=/var/lib/keylime/certs
@@ -133,14 +143,19 @@ Registrar() {
         rlRun "limeUpdateConf registrar my_cert registrar-cert.pem"
         rlRun "limeUpdateConf registrar private_key registrar-key.pem"
         rlRun "limeUpdateConf registrar private_key_pw ''"
+#        rlRun "limeUpdateConf registrar registrar_tls_dir $CERTDIR"
+#        rlRun "limeUpdateConf registrar registrar_ca_cert cacert.pem"
+#        rlRun "limeUpdateConf registrar registrar_my_cert registrar-cert.pem"
+#        rlRun "limeUpdateConf registrar registrar_private_key registrar-key.pem"
+#        rlRun "limeUpdateConf registrar registrar_private_key_pw ''"
         # configure registrar
         rlRun "limeUpdateConf registrar registrar_ip ${REGISTRAR_IP}"
 
         limeStartRegistrar
         rlRun "limeWaitForRegistrar"
 
-        rlRun "rhts-sync-set -s REGISTRAR_SETUP_DONE"
-        rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE $AGENT" 0 "Waiting for the Agent to finish the test"
+        rlRun "rhts-sync-set -s REGISTRAR_SETUP_DONE_${DEBUG_RUN_COUNTER}"
+        rlRun "rhts-sync-block -s AGENT_ALL_TESTS_DONE_${DEBUG_RUN_COUNTER} $AGENT" 0 "Waiting for the Agent to finish the test"
     rlPhaseEnd
 
     rlPhaseStartCleanup "Registrar cleanup"
@@ -153,7 +168,7 @@ Registrar() {
 Agent() {
     rlPhaseStartSetup "Agent and tenant setup"
         # Agent and tenant setup goes here
-        rlRun "rhts-sync-block -s REGISTRAR_SETUP_DONE $REGISTRAR" 0 "Waiting for the Registrar finish to start"
+        rlRun "rhts-sync-block -s REGISTRAR_SETUP_DONE_${DEBUG_RUN_COUNTER} $REGISTRAR" 0 "Waiting for the Registrar finish to start"
 
         # agent setup
         #rlRun "limeUpdateConf cloud_agent cloudverifier_ip ${VERIFIER_IP}"
@@ -172,6 +187,11 @@ Agent() {
         rlRun "limeUpdateConf tenant my_cert tenant-cert.pem"
         rlRun "limeUpdateConf tenant private_key tenant-key.pem"
         rlRun "limeUpdateConf tenant private_key_pw ''"
+        rlRun "limeUpdateConf tenant registrar_tls_dir $CERTDIR"
+        rlRun "limeUpdateConf tenant registrar_ca_cert cacert.pem"
+        rlRun "limeUpdateConf tenant registrar_my_cert agent-cert.pem"
+        rlRun "limeUpdateConf tenant registrar_private_key agent-key.pem"
+        rlRun "limeUpdateConf tenant registrar_private_key_pw ''"
         # configure tenant
         rlRun "limeUpdateConf tenant cloudverifier_ip ${VERIFIER_IP}"
         rlRun "limeUpdateConf tenant registrar_ip ${REGISTRAR_IP}"
@@ -221,7 +241,7 @@ Agent() {
     rlPhaseEnd
 
     rlPhaseStartCleanup "Agent cleanup"
-        rlRun "rhts-sync-set -s AGENT_ALL_TESTS_DONE"
+        rlRun "rhts-sync-set -s AGENT_ALL_TESTS_DONE_${DEBUG_RUN_COUNTER}"
         limeStopAgent
         rlFileSubmit $(limeAgentLogfile)
         if limeTPMEmulated; then

@@ -55,67 +55,40 @@ rlJournalStart
     # Generate runtime policy from filesystem
 
     rlPhaseStartTest "Include the IMA log with --ima-measurement-list"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --ima-measurement-list | jq '.digests'"
-        rlRun "keylime-policy create runtime --ima-measurement-list -o policy.json"
-        rlRun -s "jq '.digests' policy.json"
+        rlRun -s "keylime-policy create runtime --ima-measurement-list | jq '.digests'"
         rlAssertGrep "boot_aggregate" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Test creating a policy by extending a base policy with --base-policy"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --ima-measurement-list --base-policy ${BASE_POLICY} | jq '.digests.test'"
-        rlRun "keylime-policy create runtime --ima-measurement-list --base-policy ${BASE_POLICY} -o policy.json"
-        rlRun -s "jq '.digests.test' policy.json"
+        rlRun -s "keylime-policy create runtime --ima-measurement-list --base-policy ${BASE_POLICY} | jq '.digests.test'"
         rlAssertGrep "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Test creating a policy by converting an allowlist with --allowlist"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --allowlist ${ALLOW_LIST} | jq '.digests.test'"
-        rlRun "keylime-policy create runtime --allowlist ${ALLOW_LIST} -o policy.json"
-        rlRun -s "jq '.digests.test' policy.json"
+        rlRun -s "keylime-policy create runtime --allowlist ${ALLOW_LIST} | jq '.digests.test'"
         rlAssertGrep "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Test creating a policy by converting an exclude list with --excludelist"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --excludelist ${EXCLUDE_LIST} | jq '.excludes'"
-        rlRun "keylime-policy create runtime --excludelist ${EXCLUDE_LIST} -o policy.json"
-        rlRun -s "jq '.excludes' policy.json"
+        rlRun -s "keylime-policy create runtime --excludelist ${EXCLUDE_LIST} | jq '.excludes'"
         rlAssertGrep "test" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Set IMA log file with -m IMA_MEASUREMENT_LIST"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime -m ${IMA_LOG} | jq '.digests'"
-        rlRun "keylime-policy create runtime -m ${IMA_LOG} -o policy.json"
-        rlRun -s "jq '.digests' policy.json"
+        rlRun -s "keylime-policy create runtime -m ${IMA_LOG} | jq '.digests'"
         rlAssertGrep "test" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Output legacy format with --show-legacy-allowlist"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --show-legacy-allowlist --allowlist ${ALLOW_LIST}"
         rlRun -s "keylime-policy create runtime --show-legacy-allowlist --allowlist ${ALLOW_LIST}"
         rlAssertGrep "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2  test" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Add signature verification key with --add-ima-signature-verification-key"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --add-ima-signature-verification-key $(x509Cert cert) --add-ima-signature-verification-key $(x509Key pem) --add-ima-signature-verification-key $(x509Key --der der) | jq '.\"verification-keys\"'"
         rlAssertExists "$(x509Cert cert)"
         rlAssertExists "$(x509Key pem)"
         rlAssertExists "$(x509Key --der der)"
-        rlRun "keylime-policy create runtime --add-ima-signature-verification-key $(x509Cert cert) --add-ima-signature-verification-key $(x509Key pem) --add-ima-signature-verification-key $(x509Key --der der) -o policy.json"
-        rlRun -s "jq '.\"verification-keys\"' policy.json"
+        rlRun -s "keylime-policy create runtime --add-ima-signature-verification-key $(x509Cert cert) --add-ima-signature-verification-key $(x509Key pem) --add-ima-signature-verification-key $(x509Key --der der) | jq '.\"verification-keys\"'"
         for key in cert pem der; do
             rlRun "PUBKEY=$(openssl pkey -in "$(x509Key "${key}")" -pubout | sed 's/----.*//g' | tr -d '\n')"
             rlRun "[ -n \"${PUBKEY}\" ]"
@@ -124,11 +97,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Include files from a rootfs using --rootfs ROOTFS"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --rootfs rootfs | jq '.digests'"
-        rlRun "keylime-policy create runtime --rootfs rootfs -o policy.json"
-        rlRun -s "jq '.digests' policy.json"
+        rlRun -s "keylime-policy create runtime --rootfs rootfs | jq '.digests'"
         rlAssertGrep "test" "$rlRun_LOG"
         rlAssertGrep "nested/nested" "$rlRun_LOG"
     rlPhaseEnd
@@ -144,28 +113,17 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Include files from initrd ramdisks with --ramdisk-dir RAMDISK_DIR"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --ramdisk-dir \"boot/initrd\" | jq '.digests'"
-        rlRun "keylime-policy create runtime --ramdisk-dir \"boot/initrd\" -o policy.json"
-        rlRun -s "jq '.digests' policy.json"
+        rlRun -s "keylime-policy create runtime --ramdisk-dir \"boot/initrd\" | jq '.digests'"
         rlAssertGrep "18eb0ba043d6fc5b06b6f785b4a411fa0d6d695c4a08d2497e8b07c4043048f7" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Include ima-buf entries with --ima-buf"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime --ima-buf -m \"${IMA_LOG}\" | jq '.ima-buf'"
-        rlRun -s "keylime-policy create runtime --ima-buf -m \"${IMA_LOG}\""
+        rlRun -s "keylime-policy create runtime --ima-buf -m \"${IMA_LOG}\" | jq '.ima-buf'"
         rlAssertGrep "571016c9f57363c80e08dd4346391c4e70227e41b0247b8a3aa2240a178d3d14" "$rlRun_LOG"
     rlPhaseEnd
 
     rlPhaseStartTest "Get keyrings from IMA measurement list with --keyrings"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings | jq '.keyrings'"
-        rlRun "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings -o policy.json"
-        rlRun -s "jq '.keyrings' policy.json"
+        rlRun -s "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings | jq '.keyrings'"
         rlAssertGrep "\.ima" "$rlRun_LOG"
         rlAssertGrep "a7d52aaa18c23d2d9bb2abb4308c0eeee67387a42259f4a6b1a42257065f3d5a" "$rlRun_LOG"
         rlAssertGrep "\.test" "$rlRun_LOG"
@@ -173,11 +131,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "Ignore keyrings from IMA measurement list with --ignored-keyrings"
-        # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-        # Possibly related to https://github.com/keylime/keylime/issues/1613
-        # rlRun -s "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings | jq '.keyrings'"
-        rlRun "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings --ignored-keyrings \".ima\" -o policy.json"
-        rlRun -s "jq '.ima.ignored_keyrings' policy.json"
+        rlRun -s "keylime-policy create runtime -m \"${IMA_LOG}\" --keyrings | jq '.keyrings'"
         rlAssertGrep "\.ima" "$rlRun_LOG"
         rlRun -s "jq '.keyrings' policy.json"
         rlAssertGrep "\.test" "$rlRun_LOG"
@@ -190,11 +144,7 @@ rlJournalStart
 
     rlPhaseStartTest "Generate runtime policy from local RPM repo with --local-rpm-repo REPO"
         for repo in signed-rsa signed-ecc; do
-            # TODO: Currently, the output is not parseable as JSON directly with a pipe.
-            # Possibly related to https://github.com/keylime/keylime/issues/1613
-            # rlRun -s "keylime-policy create runtime --local-rpm-repo \"rpm/repo/${repo}\" | jq '.digests.\"/etc/dummy-foobar.conf\"'"
-            rlRun "keylime-policy create runtime --local-rpm-repo \"rpm/repo/${repo}\" -o policy.json"
-            rlRun -s "jq '.digests.\"/etc/dummy-foobar.conf\"' policy.json"
+            rlRun -s "keylime-policy create runtime --local-rpm-repo \"rpm/repo/${repo}\" | jq '.digests.\"/etc/dummy-foobar.conf\"'"
             rlAssertGrep "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9" "$rlRun_LOG"
         done
     rlPhaseEnd

@@ -1,0 +1,24 @@
+summary: Push mode authentication test on localhost
+description: |
+    Test push mode authentication functionality
+    Running all services on localhost.
+
+    Tests authentication protocol, token extension, token expiration,
+    re-authentication, and token persistence across verifier restarts.
+contact: Sergio Correia <scorreia@redhat.com>
+component:
+  - keylime
+test: ./test.sh
+framework: beakerlib
+tag:
+  - CI-Tier-1
+require:
+  - yum
+  - expect
+  - jq
+recommend:
+  - keylime
+  - python3-tomli
+duration: 5m
+enabled: true
+id: 88f2f200-b276-488c-c92e-51651g0d3873

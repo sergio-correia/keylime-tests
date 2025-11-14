@@ -53,13 +53,7 @@ rlJournalStart
         rlRun -s "keylime_tenant -c cvlist"
         # shellcheck disable=SC2154  # rlRun_LOG is set by BeakerLib's rlRun -s
         rlAssertGrep "$AGENT_ID" "$rlRun_LOG"
-
-        # TODO: For now the agent dies after starting because it tries to send
-        # measurements and fails. Restart the agent.
-        rlRun "limeStartPushAgent"
-        rlRun "limeWaitForAgentRegistration ${AGENT_ID}"
-
-        rlAssertGrep "Attestation [0-9]+ for agent .${AGENT_ID}. " "$(limeVerifierLogfile)" -E
+        rlRun "rlWaitForCmd 'grep -qE \"Attestation [0-9]+ for agent .${AGENT_ID}.\" \$(limeVerifierLogfile)' -m $limeTIMEOUT -d 1"
 
         # Store the index of the first attestation
         INDEX=$(grep -oE "Attestation [0-9]+ for agent .${AGENT_ID}. successfully passed verification" "$(limeVerifierLogfile)" | tail -1 |  grep -oE "Attestation [0-9]+" | grep -oE "[0-9]+")
@@ -71,8 +65,7 @@ rlJournalStart
         rlRun "tail /sys/kernel/security/ima/ascii_runtime_measurements | grep good-script1.sh"
         rlRun "tail /sys/kernel/security/ima/ascii_runtime_measurements | grep good-script2.sh"
         rlRun "sleep 5"
-
-        rlRun "rlWaitForCmd 'grep -qE \"Attestation $((INDEX + 1)) for agent .${AGENT_ID}. successfully passed verification\" \$(limeVerifierLogfile)' -m 120 -d 1"
+        rlRun "rlWaitForCmd 'grep -qE \"Attestation $((INDEX + 1)) for agent .${AGENT_ID}. successfully passed verification\" \$(limeVerifierLogfile)' -m $limeTIMEOUT -d 1"
     rlPhaseEnd
 
     rlPhaseStartTest "Fail keylime agent"
